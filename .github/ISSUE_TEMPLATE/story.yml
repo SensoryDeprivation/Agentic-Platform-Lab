@@ -1,0 +1,35 @@
+name: User story
+description: A piece of user-facing or platform work, written as a user story
+title: ""
+labels: ["type:story"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      description: As a <who>, I want <what>, so that <why>.
+      placeholder: As a developer, I want ..., so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: One checkbox per testable outcome.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options:
+        - S
+        - M
+        - L
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Links, constraints, open questions.
