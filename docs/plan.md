@@ -1,15 +1,16 @@
 # Agentic Platform Lab — Intent & Plan
 
-Live version: https://claude.ai/artifact/JgzfCHQzMbK3hXMVNLhn9y (this file is a snapshot from 20 Nov 2026).
+Live version: https://claude.ai/artifact/JgzfCHQzMbK3hXMVNLhn9y (this file is a snapshot from 20 Nov 2026; the live version predates the switch to AWS).
 
 ## Intent
 
-By 20 Dec 2026, this public repo shows working, hands-on experience with the agentic-engineering skills that
+By 27 Dec 2026, this public repo shows working, hands-on experience with the agentic-engineering skills that
 Platform Engineering Manager roles ask for. A hiring manager can click through it in five minutes.
 
 **Success looks like:**
 
-- A .NET API running on AKS, deployed by GitHub Actions with OIDC (no secrets in the repo)
+- A .NET API running on AWS EKS, deployed by GitHub Actions with OIDC (no secrets in the repo), with the
+  cluster defined in Terraform and rebuilt from scratch each work session
 - An agent that fixes a red CI run and opens a PR, plus one that turns a Dependabot advisory into a fix PR
 - One feature built end to end with GitHub Spec Kit (spec, plan, tasks, implement)
 - An eval suite of 15+ golden cases with an LLM judge, run in CI
@@ -18,7 +19,10 @@ Platform Engineering Manager roles ask for. A hiring manager can click through i
 
 **Non-goals:** production-grade hardening, multi-cluster setups, LangGraph or Temporal, becoming a C# developer.
 
-**Budget:** 8–10 hours a week, under €30 of Azure spend, roughly €10–20 of API spend.
+**Why AWS, not Azure:** the owner already knows Azure/AKS well; AWS is a deliberate second learning goal. The
+agent, spec and eval work in Sprints 2–3 is cloud-agnostic, so the switch only changes Sprint 1.
+
+**Budget:** 8–10 hours a week, under €30 of AWS spend (new-account credits may cover it), roughly €10–20 of API spend.
 
 ## How we work in GitHub
 
@@ -43,12 +47,15 @@ colleague's.
 
 | Sprint | Dates | Theme | Issues | Gate (don't start the next sprint until met) |
 | --- | --- | --- | --- | --- |
-| 1 | 23–29 Nov | Foundation | #1–#5 | API live on AKS, deployed via OIDC |
-| 2 | 30 Nov – 6 Dec | Agentic dev | #6–#10 | An agent-authored PR merged |
-| 3 | 7–13 Dec | Specs and evals | #11–#14 | Evals gate prompt changes in CI |
-| 4 | 14–20 Dec | Metrics and story | #15–#16 | Repo and blog post public |
+| 1 | 30 Nov – 6 Dec | Foundation | #1–#5 | API live on EKS, deployed via OIDC |
+| 2 | 7–13 Dec | Agentic dev | #6–#10 | An agent-authored PR merged |
+| 3 | 14–20 Dec | Specs and evals | #11–#14 | Evals gate prompt changes in CI |
+| 4 | 21–27 Dec | Metrics and story | #15–#16 | Repo and blog post public |
 
 Sprints 2 and 3 cover the real gaps (agents and evals). If time runs short, cut from Sprint 4, not from those.
+
+**AWS timebox:** if EKS isn't serving `/health` by Sun 6 Dec, deploy to `kind` locally (or ECS Fargate), note
+it in the retro and start Sprint 2 anyway. Finish EKS later rather than let it eat into agents and evals.
 
 ## Backlog
 
@@ -57,8 +64,8 @@ Sprints 2 and 3 cover the real gaps (agents and evals). If time runs short, cut 
 | 1 | Foundation | Repo process: board, labels, templates, protected main |
 | 2 | Foundation | Minimal .NET 8 API with /health and tests |
 | 3 | Foundation | Build and test every PR with GitHub Actions |
-| 4 | Foundation | AKS and ACR defined in Bicep |
-| 5 | Foundation | Deploy to AKS via Entra workload identity (OIDC) |
+| 4 | Foundation | EKS and ECR defined in Terraform (ephemeral cluster) |
+| 5 | Foundation | Deploy to EKS via GitHub OIDC into an IAM role |
 | 6 | Agentic dev | @claude on an issue opens a PR |
 | 7 | Agentic dev | Red CI triggers an agent fix PR |
 | 8 | Agentic dev | Security advisory starts an agent fix |
@@ -78,23 +85,28 @@ Full user stories and acceptance criteria are in the GitHub issues.
 - [x] Repo created
 - [x] Project board created
 - [x] Labels, Sprint 1–4 milestones and issues #1–#16 created
-- [ ] Add issues #1–#16 to the board (Issues → select all → Projects)
-- [ ] Board: add Backlog / Ready / In review to Status; add Sprint (iteration) and Size fields; enable Auto-add
-- [ ] Ruleset on `main`: require PR, require status checks, block force pushes
+- [x] Add issues #1–#16 to the board
+- [x] Board: add Backlog / Ready / In review to Status; add Sprint (iteration) and Size fields; enable Auto-add
+- [x] Ruleset on `main`: require PR, block force pushes and deletions (status checks added with #3)
+- [ ] AWS account: root MFA, IAM Identity Center admin user, `aws sso login` profile, $35 budget alert
 - [ ] Sprint 2: run `/install-github-app` in Claude Code to install the Claude GitHub Action
 
-**OIDC in one paragraph (issue #5):** create an Entra app registration with a federated credential, subject
-`repo:SensoryDeprivation/agentic-platform-lab:ref:refs/heads/main`. Grant it AcrPush and AKS deploy roles. In the
-workflow set `permissions: id-token: write` and use `azure/login@v2` with `client-id`, `tenant-id`,
-`subscription-id` (repo variables, not secrets).
+**OIDC in one paragraph (issue #5):** in `infra/bootstrap`, create an IAM OIDC identity provider for
+`token.actions.githubusercontent.com` (audience `sts.amazonaws.com`) and an IAM role whose trust policy only
+accepts subject `repo:SensoryDeprivation/Agentic-Platform-Lab:ref:refs/heads/main` (the match is case-sensitive,
+so use the repo's exact casing). Give the role ECR push rights, and in `infra/cluster` an EKS access entry so it
+can deploy. In the workflow set `permissions: id-token: write` and use `aws-actions/configure-aws-credentials`
+with `role-to-assume` and `aws-region` (repo variables, not secrets). Azure equivalent: Entra app registration +
+federated credential + AcrPush and AKS RBAC roles.
 
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
 | Employer IP (AI.Skills, internal standards) | Only a generic rewrite, or written OK first. Never copy internal content |
-| Work Azure tenant used by mistake | Personal pay-as-you-go subscription only |
-| AKS cost | Free tier control plane, one small node, stop nightly; fallback `kind` locally |
+| Employer cloud account used by mistake | Personal AWS account only; check `aws sts get-caller-identity` before any apply |
+| EKS cost ($0.10/h control plane, can't be stopped) | Ephemeral cluster via `up.sh`/`down.sh`, public subnets, no NAT, one small node; $35 budget alert; fallback `kind` locally |
+| AWS learning curve eats Sprint 1 | Timebox: `kind` or ECS fallback if EKS isn't live by 6 Dec |
 | API cost | Spending limit on the API key |
 | Slippage | Protect Sprints 2–3; cut Sprint 4 scope first, never skip the write-up |
 | Overclaiming in interviews | "I built this to learn X; here's what I'd do differently at team scale" |
